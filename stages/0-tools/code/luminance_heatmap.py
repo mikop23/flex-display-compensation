@@ -1,6 +1,6 @@
 import cv2
 import matplotlib.pyplot as plt
-img = cv2.imread("stages/0-tools/data/test.jpg")
+img = cv2.imread(r"stages/0-tools/data/test.jpg")
 
 B = img[0:2048,0:2048,0]
 G = img[0:2048,0:2048,1]

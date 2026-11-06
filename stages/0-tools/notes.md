@@ -28,3 +28,13 @@
 - shape, dtype은 괄호 없음 / min(), max(), reshape()는 괄호 있음
 - 파이썬 기본 min(배열) 말고 배열.min()
 - 크기를 숫자로 박지 말고 : 또는 img.shape 사용
+
+## 평가 지표 (common/metrics.py)
+
+- PSNR = 10·log₁₀(255²/MSE), MSE = 칸별 차이 제곱의 평균. 높을수록 비슷(dB)
+- SSIM = 7×7 조각마다 (평균 밝기 × 변화 크기(표준편차) × 변화 패턴(상관)) → 조각 전체 평균. 1에 가까울수록 비슷
+- 실험 (test.jpg 흑백)
+  - 밝기 +10: PSNR 28.13 dB, SSIM 0.990 → SSIM은 밝기 변화에 관대
+  - 1픽셀 밀기: PSNR 22.57dB, SSIM 0.604 → 둘 다 위치 어긋남에 약함
+- 그래서 기하 보정 평가는 PSNR·SSIM 말고 픽셀 위치 오차를 따로 재야 함
+- SSIM 설정: scikit-image structural_similarity 기본값 (7×7 균일 창, K1=0.01, K2=0.03), data_range=255. 원논문(Wang 2004)은 11×11 가우시안이라 값이 다를 수 있음

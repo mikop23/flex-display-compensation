@@ -44,6 +44,12 @@ mask = np.zeros(img.shape, dtype=bool)
 mask[:50, :] = True
 print(ssim(img, bright, mask))    
 
+q = img[:,:-1]
+w = img[:,1:]
+print(psnr(q,w), ssim(q,w))
+
+
+
 
 if __name__ == '__main__':
     a = np.array([[100, 100], [100, 100]], dtype=np.uint8)

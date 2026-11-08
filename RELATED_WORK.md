@@ -7,8 +7,6 @@
 | | | | |
 
 
-## 읽을 예정 (2026-11-06 선정)
-
 Park & Kang (2025) — Deformation-Aware Luminance Compensation using Gaussian-Weighted Kernels for Stretchable Displays
 출처: SID Symposium Digest 2025, 27-4 (4쪽 학회 논문), doi:10.1002/sdtp.18165
 확장판: JSID 2025 (아래 ### 항목)
@@ -79,7 +77,7 @@ BIR 값(Table 1, PDF 5쪽): 비율·D에 따른 일관된 경향 없음 (단방�
 
 **무엇을 했나**
 - 문제: 신축형 디스플레이 구현 시 높은 신축성, 균일한 변형, 낮은 이미지 왜곡을 동시에 달성해야 함 (보통 기판은 푸아송 효과로 가로세로 변형이 달라 이미지가 찌그러짐)
-- 방법: 마이크로 LED + 키리가미 기반 오그제틱(음의 푸아송 비) 회로 기판(meta-PCB)을 설계·제작한 메타 디스플레이. 회전 사각형 + 힌지 구조로 푸아송 비 -1
+- 방법: 마이크로 LED + 키리가미 기반 오그제틱(음의 푸아송 비) 회로 기판(meta-PCB)을 설계·제작한플 메타 디스레이. 회전 사각형 + 힌지 구조로 푸아송 비 -1
 - 비교 대상: PDMS 기판 (Fig. 3b 단축, Fig. 4 g–i 이축), 기존 플렉서블 디스플레이 (Fig. 5 e·f, 반구 부착)
   - Fig. 3b의 Natural rubber, Polyimide, Cork 등은 문헌값 기준선 (직접 측정 아님)
 - 검증: 실제로 샘플을 만들어 당겨서 측정

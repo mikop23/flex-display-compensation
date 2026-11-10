@@ -7,8 +7,7 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[3]))
 from common.interpolation import bilinear
 
 
-def make_viewed(img, R, D):
-    H,W = img.shape[:2]
+def make_view_maps(H, W, R, D):
     c = np.arange(W)
     r = np.arange(H)
     cols,rows = np.meshgrid(c, r)
@@ -25,7 +24,13 @@ def make_viewed(img, R, D):
 
     map_x[~mask] = 0
     map_y[~mask] = 0
+    return map_x, map_y, mask
 
+
+
+def make_viewed(img, R, D):
+    H, W = img.shape[:2]
+    map_x, map_y, mask = make_view_maps(H, W, R, D)
     viewed = np.round(bilinear(img, map_x, map_y)).astype(np.uint8)
 
     viewed[~mask] = 0

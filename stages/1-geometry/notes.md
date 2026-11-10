@@ -15,7 +15,7 @@
   - [ ] 전역 호모그래피 1개 (계산 방법은 REPORT에 식으로 남기기)
   - [ ] 내 메쉬 워핑 (N별)
 - [x] **구현 검증**: 내 보간을 cv2.remap과 같은 입력으로 비교 (87.3 dB, 3칸 ±1)
-- [ ] **구현 검증**: 내 워핑(make_corrected·make_viewed)을 cv2.remap과 같은 map으로 비교
+- [x] **구현 검증**: 내 워핑을 cv2.remap과 같은 map으로 비교 (시뮬레이션 map, 다른 칸 6개 ±1, 90.4 dB). make_corrected는 같은 bilinear 사용, map(F)은 왕복 오차로 검증
 - [ ] 보정 전후 픽셀 위치 오차를 곡률 반경별로 측정해 그래프로
 - [ ] 화질 보조 지표: PSNR·SSIM (mask 안, 정확한 보정 경우를 기준으로 상대 비교)
 - [ ] REPORT.md + LIMITS.md, 저장소 공개
@@ -101,12 +101,20 @@
 - 계산은 실수로, 반올림은 마지막에 한 번 (uint8에 넣으면 버림 → 평균 0.5 어두워지는 치우침)
 - 비교할 땐 imshow에 vmin=0, vmax=255 고정, 숫자 비교는 두 방법 모두 유효한 영역에서만
 
-## 구현 검증 (verify_remap.py)
+## 구현 검증 (verify_remap.py, verify_warp_cylinder.py)
 
+### 회전 (verify_remap.py)
 - 내 쌍선형 역방향 워핑 vs cv2.remap(INTER_LINEAR), 30° 중심 회전, 200×150 흑백
 - 유효 영역(ok_b) PSNR 87.3 dB, 다른 칸 3개, 최대 차이 1
 - 완전히 같지 않은 이유: OpenCV는 보간 가중치를 1/32 단위 고정소수점으로 근사 → x.5 근처에서 반올림이 갈림
 - remap은 좌표표만 받아 보간함. 좌표 계산(H_inv)은 두 쪽이 같은 걸 썼으므로 이번 검증은 "보간 부분"만 확인한 것
+
+### 원통 (verify_warp_cylinder.py, 2026-11-10)
+- 원통 시뮬레이션 map(R = 300, D = 1000, 400 × 300), 격자 입력, 내 bilinear vs cv2.remap(INTER_LINEAR), mask 안
+- 다른 칸 6개, 최대 차이 1, PSNR 90.4 dB → 통과 (차이는 OpenCV 고정소수점 근사)
+- 비교한 건 시뮬레이션 map(make_view_maps)뿐. make_corrected는 같은 bilinear를 쓰므로 따로 안 함
+- 워핑 = map(왕복 오차로 검증) + bilinear(cv2 비교로 검증)
+- 주의: 처음에 인자 순서를 (H, R, D, H), (H, W, D, R)로 잘못 넣어 다른 원통으로 계산됨. 에러 없이 틀린 결과가 나오므로 키워드 인자(H=H, W=W, R=R, D=D)로 넘기기
 
 ## 원통형 휜 화면: 시뮬레이션과 보정 (2026-11-08)
 
@@ -120,7 +128,58 @@
 
 ### 좌표 정의
 - (x, y): 휘기 전 화면 좌표, 중심 기준(px). 중심 = ((W−1)/2, (H−1)/2) = (199.5, 149.5)
-- (X, Y, Z): 휜 뒤 3D 좌표.
+- (X, Y, Z): 휜 뒤 3D 좌표. Z는 시청자에게서 멀어지는 쪽이 +
+- (u, v): 시청자 이미지 좌표(px), 원본과 같은 크기 H × W
+- 원통 중심 (X, Z) = (0, R), 시청자 눈 (0, 0, −D)
+
+### F: screen_to_view (cylinder.py)
+- θ = x / R
+- X = R sin θ, Y = y, Z = R(1 − cos θ)
+- u = D·X / (D + Z), v = D·Y / (D + Z)  (위·옆에서 본 닮음)
+- 화면 끝으로 갈수록 u < x, v도 작아짐 → 가로·세로 모두 휘는 2D 왜곡
+
+### F⁻¹: view_to_screen (cylinder.py)
+- u는 x에만 의존 → x 먼저, 그다음 y
+- u 식을 정리하면 a sin θ + b cos θ = c
+  - a = DR, b = uR, c = u(D + R)
+- 삼각함수 합성: r = √(a² + b²), φ = arctan2(b, a) → θ = arcsin(c / r) − φ, x = Rθ
+- y = v(Z + D) / D, Z = R(1 − cos θ)
+- arcsin은 해가 두 개일 때 앞쪽(보이는) 점을 돌려줌. 화면이 접점보다 덜 감겨 있으면 문제없음
+- c / r > 1이면 해 없음(nan): |u| > RD / √(D² + 2DR) ≈ 237 px (R = 300, D = 1000), 눈에서 원통에 접하는 선 바깥
+
+### 검증: 왕복 오차
+- 입력: tx = np.linspace(-200, 200, 2000), ty = np.linspace(-200, 200, 2000), R = 300, D = 1000
+- tx → F → F⁻¹ → x̂, |tx − x̂|와 |ty − ŷ|의 최댓값
+- 최대 오차 x: 1.4 × 10⁻¹³ px, y: 5.7 × 10⁻¹⁴ px → 시뮬레이션 도구 오차는 기준(1 px)에 비해 무시 가능
+- 한계: tx와 ty를 같이 움직여서 대각선 위의 점들만 비교함. 화면 전체 확인은 meshgrid 격자로 다시 할 것
+
+### 실험 설정
+- W × H = 400 × 300, R = 300, D = 1000 (px)
+- 화면 끝 각도 θ = 199.5 / 300 ≈ 0.67 rad(약 38°), 접점 각 약 77°
+- R > W/π ≈ 130 유지 (θ < 90°)
+- 보정 크기 방식: 원본을 원래 크기로 두고 양 끝은 잘림 (원본 축소 방식은 안 씀)
+
+### 보정 결과 (correct_cylinder.py)
+- 입력: 40 px 간격 격자
+- 세로선 간격이 양 끝으로 갈수록 넓어지고, 가로선이 양 끝에서 위아래로 벌어짐 → 미리 넓히기 확인
+- 끝쪽 선이 두껍고 흐림: 1 px 선이 늘어나며 보간으로 번짐 (정상)
+
+### 시뮬레이션 (simulate_cylinder.py, 11/10 완료)
+- 유효 영역 mask (H, W) bool: nan 아님 & 0 ≤ map_x < W−1 & 0 ≤ map_y < H−1
+  - nan 아님: arcsin 범위 밖(c / r > 1, 해 없음) 칸 제외. nan은 비교에서 항상 False라 범위 조건만으로도 빠지지만, 읽기 쉽게 따로 적음
+  - W−1 미만: bilinear가 i+1, j+1 칸도 읽음
+- 처리 순서: mask 만들기 → False 칸 좌표를 0(안전값)으로 → 보간 → False 칸 검정
+- 결과: 원본 격자 → 좌우 검정 띠(화면이 u ≈ 25 ~ 374에만 보임)와 오므려진 격자 / corrected → 40 px 간격 반듯한 격자
+
+### 코드 메모
+- 자료형: 이미지 값 uint8 / 계산 실수형 / 인덱스 int (uint8 인덱스는 255에서 넘침)
+- 인덱스 변환: np.floor(x).astype(int) (astype만 쓰면 음수에서 floor와 다름)
+- 보간 결과 → uint8: np.round 먼저 (astype은 버림)
+- 괄호: 동작이면 괄호 arr.max(), arr.astype(int) / 정보면 없음 arr.shape, arr.dtype
+  - "is not callable" → 괄호 빼기, "builtin_function_or_method" → 괄호 붙이기
+- 배열 조건: (조건) & (조건), and와 0 <= a < b는 배열에서 안 됨
+- nan은 어떤 비교도 False
+- 함수 안에서는 함수가 받은 것만 쓰기 (밖의 original, H, W를 쓰면 에러 없이 틀린 결과)
 
 ## 위치 오차 측정 (2026-11-10)
 
@@ -167,7 +226,7 @@
 - common/interpolation.py: bilinear (범위 검사 안 함)
 - cylinder.py: screen_to_view(F), view_to_screen(F⁻¹)
 - correct_cylinder.py: make_corrected(img, R, D) → 보정 이미지
-- simulate_cylinder.py: make_viewed(img, R, D) → (viewed, mask)
+- simulate_cylinder.py: make_view_maps(H, W, R, D) → (map_x, map_y, mask), make_viewed(img, R, D) → (viewed, mask)
 - eval_cylinder.py: 위치 오차 계산
+- verify_warp_cylinder.py: 원통 map으로 bilinear vs cv2.remap 비교
 - 경로: sys.path에 저장소 루트를 __file__ 기준으로 추가 (실행 위치와 무관). sys.path.append('common')은 실행 위치에 따라 실패함
-- 시각 확인: 원본 격자 → 좌우 검정 띠와 오므려진 격자 / corrected → 반듯한 격자
